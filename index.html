@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examen de Manejo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+        .quiz-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            display: inline-block;
+            max-width: 600px;
+            margin: auto;
+        }
+        .question {
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+        .button {
+            padding: 12px 20px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+        .option1 { background-color: #007bff; color: white; } /* Azul */
+        .option2 { background-color: #ff9800; color: white; } /* Naranja */
+        .option3 { background-color: #4caf50; color: white; } /* Verde */
+        .button:hover { opacity: 0.8; }
+        .voice-button {
+            background-color: #673ab7;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .timer { font-size: 22px; font-weight: bold; color: red; }
+        .score { font-size: 18px; margin-top: 20px; }
+        .review { margin-top: 20px; text-align: left; max-width: 600px; margin: auto; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h2>Examen de Manejo</h2>
+        <p class="timer" id="timer">Tiempo restante: 50:00</p>
+        <h3 id="question" class="question"></h3>
+        <div id="options"></div>
+        <br>
+        <button class="voice-button" onclick="speakQuestionWithOptions()">🔊 Escuchar Pregunta y Opciones</button>
+        <p class="score">Correctas: <span id="correctScore">0</span> | Incorrectas: <span id="incorrectScore">0</span></p>
+    </div>
+
+    <div class="review" id="reviewContainer"></div>
+
+    <audio id="correctSound" src="correct.OGG"></audio>
+    <audio id="incorrectSound" src="wrong.OGG"></audio>
+
+    <script>
+        const questionBank = [
+            { question: "¿Qué significa una señal de 'STOP'?", options: ["Detenerse completamente", "Reducir la velocidad", "Seguir adelante sin detenerse"], correct: 0 },
+            { question: "Si un semáforo está en amarillo, ¿qué se debe hacer?", options: ["Acelerar antes de que cambie a rojo", "Reducir la velocidad y prepararse para detenerse", "Detenerse inmediatamente"], correct: 1 },
+            { question: "¿Cuál es el límite de velocidad en una zona escolar?", options: ["80 km/h", "40 km/h", "60 km/h"], correct: 1 },
+        ];
+
+        function getRandomQuestions(array, count) {
+            return array.sort(() => Math.random() - 0.5).slice(0, count);
+        }
+
+        let quizData = getRandomQuestions(questionBank, 3);
+        let currentQuestionIndex = 0;
+        let correctAnswers = 0;
+        let incorrectAnswers = 0;
+        let answerReview = [];
+        let timeLeft = 50 * 60;
+
+        function updateTimer() {
+            let minutes = Math.floor(timeLeft / 60);
+            let seconds = timeLeft % 60;
+            document.getElementById("timer").innerText = `Tiempo restante: ${minutes}:${seconds < 10 ? "0" + seconds : seconds}`;
+            if (timeLeft > 0) {
+                timeLeft--;
+                setTimeout(updateTimer, 1000);
+            } else {
+                endQuiz();
+            }
+        }
+
+        function loadQuestion() {
+            const questionData = quizData[currentQuestionIndex];
+            document.getElementById("question").innerText = questionData.question;
+            document.getElementById("options").innerHTML = "";
+
+            questionData.options.forEach((option, index) => {
+                const button = document.createElement("button");
+                button.className = "button " + (index === 0 ? "option1" : index === 1 ? "option2" : "option3");
+                button.innerText = option;
+                button.onclick = () => checkAnswer(index);
+                document.getElementById("options").appendChild(button);
+            });
+        }
+
+        function checkAnswer(selectedIndex) {
+            const questionData = quizData[currentQuestionIndex];
+            const isCorrect = selectedIndex === questionData.correct;
+            document.getElementById(isCorrect ? "correctSound" : "incorrectSound").play();
+
+            answerReview.push({
+                question: questionData.question,
+                chosen: questionData.options[selectedIndex],
+                correct: questionData.options[questionData.correct],
+                status: isCorrect ? "✅ Correcto" : "❌ Incorrecto"
+            });
+
+            if (isCorrect) correctAnswers++;
+            else incorrectAnswers++;
+
+            document.getElementById("correctScore").innerText = correctAnswers;
+            document.getElementById("incorrectScore").innerText = incorrectAnswers;
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizData.length) {
+                setTimeout(loadQuestion, 1000);
+            } else {
+                endQuiz();
+            }
+        }
+
+        function speakQuestionWithOptions() {
+            let questionData = quizData[currentQuestionIndex];
+            let speech = new SpeechSynthesisUtterance(questionData.question);
+
+            // Add options with their corresponding color
+            questionData.options.forEach((option, index) => {
+                let colorLabel = index === 0 ? "Azul" : index === 1 ? "Naranja" : "Verde";
+                speech.text += ` Opción ${colorLabel}: ${option}.`;
+            });
+
+            speech.lang = "es-ES";
+            window.speechSynthesis.speak(speech);
+        }
+
+        function endQuiz() {
+            let resultMessage = correctAnswers >= 2 ? "¡Felicidades, aprobaste el examen! 🚗🎉" : "Lo siento, no alcanzaste el mínimo requerido. 😢";
+            alert(`${resultMessage}\nCorrectas: ${correctAnswers}\nIncorrectas: ${incorrectAnswers}`);
+            displayReview();
+        }
+
+        function displayReview() {
+            let reviewHTML = "<h3>Revisión de respuestas:</h3>";
+            answerReview.forEach(item => {
+                reviewHTML += `<p><strong>${item.question}</strong><br> Tu respuesta: ${item.chosen}<br> Respuesta correcta: ${item.correct}<br> ${item.status}</p>`;
+            });
+            document.getElementById("reviewContainer").innerHTML = reviewHTML;
+        }
+
+        loadQuestion();
+        updateTimer();
+    </script>
+</body>
+</html>
